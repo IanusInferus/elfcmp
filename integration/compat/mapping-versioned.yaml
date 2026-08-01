@@ -1,0 +1,11 @@
+# This mapping is expected to fail unless COMPAT_1.0 is already required.
+format: 1
+mappings:
+- from:
+    library: libc.so.6
+    symbol: explicit_bzero
+    version: GLIBC_2.25
+  to:
+    library: libcompat-versioned.so.1
+    symbol: elfcmp_explicit_bzero
+    version: COMPAT_1.0

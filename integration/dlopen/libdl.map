@@ -1,0 +1,7 @@
+GLIBC_2.2.5 {
+    global:
+        dlopen;
+        elfcmp_libdl_marker;
+    local: *;
+};
+

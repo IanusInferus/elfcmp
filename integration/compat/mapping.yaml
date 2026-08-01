@@ -1,0 +1,18 @@
+# Map the versioned libc import to the unversioned compatibility function.
+format: 1
+mappings:
+- from:
+    library: libc.so.6
+    symbol: __libc_start_main
+    version: GLIBC_2.34
+  to:
+    library: libc.so.6
+    symbol: __libc_start_main
+    version: GLIBC_2.2.5
+- from:
+    library: libc.so.6
+    symbol: explicit_bzero
+    version: GLIBC_2.25
+  to:
+    library: libcompat.so.1
+    symbol: elfcmp_explicit_bzero
