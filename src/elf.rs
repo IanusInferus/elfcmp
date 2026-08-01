@@ -14,6 +14,7 @@ pub struct ElfInfo {
     pub imported: BTreeSet<(String, Option<String>)>,
     pub exported: BTreeSet<(String, Option<String>)>,
     pub required_versions: BTreeMap<(String, String), u16>,
+    pub runpaths: Vec<String>,
 }
 
 pub fn inspect(path: &Path) -> Result<ElfInfo> {
@@ -64,6 +65,12 @@ pub fn inspect(path: &Path) -> Result<ElfInfo> {
         imported,
         exported,
         required_versions,
+        runpaths: elf
+            .runpaths
+            .iter()
+            .flat_map(|path| path.split(':'))
+            .map(str::to_owned)
+            .collect(),
     })
 }
 
@@ -272,7 +279,10 @@ pub fn find_library(
     }
 }
 
-fn library_architecture_matches(path: &Path, expected: Option<&ElfArchitecture>) -> bool {
+pub(crate) fn library_architecture_matches(
+    path: &Path,
+    expected: Option<&ElfArchitecture>,
+) -> bool {
     let Some(expected) = expected else {
         return true;
     };
@@ -339,6 +349,7 @@ mod tests {
             imported: BTreeSet::new(),
             exported,
             required_versions: BTreeMap::new(),
+            runpaths: Vec::new(),
         };
         assert!(exports_symbol(&info, "function", None));
         assert!(exports_symbol(&info, "function", Some("VERSION_1")));
@@ -360,6 +371,7 @@ mod tests {
             imported: BTreeSet::new(),
             exported: BTreeSet::new(),
             required_versions,
+            runpaths: Vec::new(),
         };
         assert_eq!(required_version_index(&info, "GLIBC_2.2.5"), Some(3));
         assert_eq!(required_version_index(&info, "GLIBC_2.34"), None);

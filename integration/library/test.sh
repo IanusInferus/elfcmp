@@ -5,7 +5,8 @@ source "$TEST_DIR/../common.sh"
 
 build_elfcmp
 require_command objcopy
-mkdir -p "$TEST_TMP/build" "$TEST_TMP/source-root/wrong" "$TEST_TMP/source-root/right"
+mkdir -p "$TEST_TMP/build" "$TEST_TMP/source-root/wrong" \
+    "$TEST_TMP/source-root/right" "$TEST_TMP/source-root/fallback"
 ln -s "$UBUNTU_SYSROOT/lib" "$TEST_TMP/source-root/lib"
 ln -s "$UBUNTU_SYSROOT/usr" "$TEST_TMP/source-root/usr"
 
@@ -16,16 +17,21 @@ ubuntu_cc -O2 -Wall -Wextra -fPIC -shared "$TEST_DIR/dependency.c" \
 cp "$TEST_TMP/source-root/right/$DEPENDENCY_NAME" \
     "$TEST_TMP/source-root/wrong/$DEPENDENCY_NAME"
 objcopy --alt-machine-code=3 "$TEST_TMP/source-root/wrong/$DEPENDENCY_NAME"
+ubuntu_cc -O2 -Wall -Wextra -fPIC -shared "$TEST_DIR/dependency.c" \
+    -DELFCMP_DEPENDENCY_VALUE=7 -Wl,-soname,"$DEPENDENCY_NAME" \
+    -o "$TEST_TMP/source-root/fallback/$DEPENDENCY_NAME"
 ubuntu_cc -O2 -Wall -Wextra -fPIC -shared "$TEST_DIR/library.c" \
     -L"$TEST_TMP/source-root/right" -Wl,-l:libdependency.so.1 \
-    -Wl,-soname,"$LIBRARY_NAME" -o "$TEST_TMP/build/$LIBRARY_NAME"
+    -Wl,-soname,"$LIBRARY_NAME" -Wl,-rpath,/right \
+    -o "$TEST_TMP/build/$LIBRARY_NAME"
 
 "$ELFCMP" copy "$TEST_TMP/build/$LIBRARY_NAME" "$TEST_TMP/bundle" \
     --sysroot "$TEST_TMP/source-root" \
-    --system-lib-search-paths "/wrong:/right:$UBUNTU_SYSTEM_LIB_SEARCH_PATHS"
+    --system-lib-search-paths "/fallback:/wrong:$UBUNTU_SYSTEM_LIB_SEARCH_PATHS"
 
 test -f "$TEST_TMP/bundle/$LIBRARY_NAME"
 test -f "$TEST_TMP/bundle/$DEPENDENCY_NAME"
+cmp "$TEST_TMP/bundle/$DEPENDENCY_NAME" "$TEST_TMP/source-root/right/$DEPENDENCY_NAME"
 if [[ -d $TEST_TMP/bundle/lib ]]; then
     echo "shared-library bundle unexpectedly contains a lib/ directory" >&2
     exit 1

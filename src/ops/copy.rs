@@ -10,7 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fs::{self, File},
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 const SYSTEM_LIB_BASENAMES: &[&str] =
@@ -78,16 +78,20 @@ pub fn run(args: CopyArgs) -> Result<()> {
                 })
                 .collect(),
         });
+        let object_runpaths = runpath_search_paths(&info.runpaths, &object, &args.sysroot);
         for name in info.needed {
             if !visited.insert(name.clone()) {
                 continue;
             }
-            let source = elf::find_library(
-                &args.sysroot,
-                &name,
-                &args.system_lib_search_paths,
-                Some(&info.architecture),
-            )?;
+            let source = find_runpath_library(&object_runpaths, &name, &info.architecture)
+                .unwrap_or_else(|| {
+                    elf::find_library(
+                        &args.sysroot,
+                        &name,
+                        &args.system_lib_search_paths,
+                        Some(&info.architecture),
+                    )
+                })?;
             eprintln!("[copy] library {name}: {}", source.display());
             let dependency = elf::inspect(&source)?;
             if is_system_library(&name, &basenames) {
@@ -136,6 +140,43 @@ pub fn run(args: CopyArgs) -> Result<()> {
         reference_path.display()
     );
     Ok(())
+}
+
+fn runpath_search_paths(runpaths: &[String], object: &Path, sysroot: &Path) -> Vec<PathBuf> {
+    let origin = object.parent().unwrap_or_else(|| Path::new("."));
+    runpaths
+        .iter()
+        .filter(|path| !path.is_empty())
+        .map(|path| {
+            if path.contains("$ORIGIN") || path.contains("${ORIGIN}") {
+                PathBuf::from(
+                    path.replace("${ORIGIN}", &origin.to_string_lossy())
+                        .replace("$ORIGIN", &origin.to_string_lossy()),
+                )
+            } else {
+                if path.starts_with('/') {
+                    sysroot.join(path.trim_start_matches('/'))
+                } else {
+                    sysroot.join(path)
+                }
+            }
+        })
+        .collect()
+}
+
+fn find_runpath_library(
+    directories: &[PathBuf],
+    name: &str,
+    architecture: &crate::manifest::ElfArchitecture,
+) -> Option<Result<PathBuf>> {
+    for directory in directories {
+        let candidate = directory.join(name);
+        if candidate.is_file() && elf::library_architecture_matches(&candidate, Some(architecture))
+        {
+            return Some(Ok(candidate));
+        }
+    }
+    None
 }
 
 fn copy_file(source: &Path, destination: &Path) -> Result<()> {
@@ -254,5 +295,32 @@ mod tests {
         assert_eq!(soname_basename("liba.so"), "liba");
         assert_eq!(soname_basename("liba.so.debug.1"), "liba.so.debug.1");
         assert_eq!(soname_basename("liba.1"), "liba.1");
+    }
+
+    #[test]
+    fn runpath_expands_origin_and_stays_relative_to_sysroot() {
+        assert_eq!(
+            runpath_search_paths(
+                &["$ORIGIN/../private".into(), "/opt/vendor".into()],
+                Path::new("/sysroot/usr/lib/libconsumer.so.1"),
+                Path::new("/sysroot")
+            ),
+            [
+                PathBuf::from("/sysroot/usr/lib/../private"),
+                PathBuf::from("/sysroot/opt/vendor")
+            ]
+        );
+    }
+
+    #[test]
+    fn origin_outside_sysroot_remains_an_actual_directory() {
+        assert_eq!(
+            runpath_search_paths(
+                &["${ORIGIN}/private".into()],
+                Path::new("/build/libconsumer.so.1"),
+                Path::new("/sysroot")
+            ),
+            [PathBuf::from("/build/private")]
+        );
     }
 }

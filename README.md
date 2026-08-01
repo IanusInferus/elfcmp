@@ -90,6 +90,12 @@ records imported symbols supplied by skipped system libraries.
   `usr/local/lib`, plus one-level multiarch directories beneath `lib` and
   `usr/lib`.
 
+  When an input or recursively scanned library contains `DT_RUNPATH`, its
+  colon-separated directories are searched first for that library's direct
+  dependencies. Literal absolute entries are interpreted beneath `--sysroot`.
+  `$ORIGIN` and `${ORIGIN}` are expanded to the directory containing the ELF,
+  including when the input itself is outside the sysroot.
+
   Candidate libraries must match the input ELF's machine architecture, bitness,
   and endianness. A same-named library for another architecture is skipped; if
   no compatible candidate exists, `elfcmp` reports the rejected paths.
