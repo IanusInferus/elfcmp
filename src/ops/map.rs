@@ -4,23 +4,35 @@ use crate::{
     manifest::{self, MappingEntry, MappingFile, ReferenceTable, SymbolEndpoint},
 };
 use anyhow::Result;
+use std::collections::BTreeMap;
 
 pub fn run(args: MapArgs) -> Result<()> {
     let reference: ReferenceTable = manifest::read_yaml(&args.reference)?;
     let mut mappings = Vec::new();
+    let mut libraries = BTreeMap::new();
     for required in &reference.symbols {
-        let present = elf::find_library(
-            &args.target_sysroot,
-            &required.library,
-            &args.system_lib_search_paths,
-            reference.architecture.as_ref(),
-        )
-        .and_then(|path| elf::inspect(&path))
-        .map(|info| {
-            info.exported
-                .contains(&(required.symbol.clone(), required.version.clone()))
-        })
-        .unwrap_or(false);
+        if !libraries.contains_key(&required.library) {
+            let library = match elf::find_library(
+                &args.target_sysroot,
+                &required.library,
+                &args.system_lib_search_paths,
+                reference.architecture.as_ref(),
+            ) {
+                Ok(path) => {
+                    eprintln!("[map] library {}: {}", required.library, path.display());
+                    elf::inspect(&path).ok()
+                }
+                Err(_) => None,
+            };
+            libraries.insert(required.library.clone(), library);
+        }
+        let present = libraries
+            .get(&required.library)
+            .and_then(Option::as_ref)
+            .is_some_and(|info| {
+                info.exported
+                    .contains(&(required.symbol.clone(), required.version.clone()))
+            });
         if !present {
             let endpoint = SymbolEndpoint {
                 library: required.library.clone(),

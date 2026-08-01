@@ -75,6 +75,15 @@ pub fn run(args: PatchArgs) -> Result<()> {
 
     for object in &objects {
         let info = elf::inspect(object)?;
+        if object
+            .file_name()
+            .is_some_and(|name| elf::is_shared_library_filename(&name.to_string_lossy()))
+        {
+            eprintln!("[patch] library object: {}", object.display());
+        }
+        for needed in &info.needed {
+            eprintln!("[patch] library {needed}, required by {}", object.display());
+        }
         if !renames.is_empty() {
             invoke(
                 &args.patchelf,
@@ -100,6 +109,11 @@ pub fn run(args: PatchArgs) -> Result<()> {
                     && !info.needed.contains(&entry.to.library)
                     && added_needed.insert(entry.to.library.clone())
                 {
+                    eprintln!(
+                        "[patch] adding library {} to {}",
+                        entry.to.library,
+                        object.display()
+                    );
                     invoke(
                         &args.patchelf,
                         &[

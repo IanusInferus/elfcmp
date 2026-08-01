@@ -230,6 +230,18 @@ version index. Adding brand-new `.gnu.version_r` records is not yet supported.
 
 Run `elfcmp help` or `elfcmp <command> --help` for all options.
 
+### Library logging
+
+Every command logs library use to standard error with its operation name.
+`copy`, `map`, and `check` report resolved SONAMEs and filesystem paths. `map`
+and `check` log and inspect each library only once even when many symbols use
+it. `check` additionally logs every unresolved mapping with the library, symbol,
+and version of both its `from` and `to` endpoints; an absent version is shown as
+`<unversioned>`.
+`patch` reports each shared-library object it processes, every `DT_NEEDED`
+library it observes, and every library it adds. Standard error is used so these
+logs can be redirected independently from normal command output.
+
 ## Integration tests
 
 Reproducible tests for unversioned compatibility symbols and reuse of an

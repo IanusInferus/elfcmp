@@ -26,6 +26,9 @@ pub fn run(args: CopyArgs) -> Result<()> {
         .file_name()
         .context("input path has no file name")?;
     let input_is_library = elf::is_shared_library_filename(&input_name.to_string_lossy());
+    if input_is_library {
+        eprintln!("[copy] library input: {}", args.input.display());
+    }
     let dependency_directory = if input_is_library {
         args.output.clone()
     } else {
@@ -85,6 +88,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
                 &args.system_lib_search_paths,
                 Some(&info.architecture),
             )?;
+            eprintln!("[copy] library {name}: {}", source.display());
             let dependency = elf::inspect(&source)?;
             if is_system_library(&name, &basenames) {
                 system_objects.insert(name, dependency);

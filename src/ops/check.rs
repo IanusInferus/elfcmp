@@ -4,24 +4,37 @@ use crate::{
     manifest::{self, MappingFile, ReferenceTable, SymbolEndpoint, SymbolRef},
 };
 use anyhow::{bail, Result};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn endpoint_exists(
     root: &std::path::Path,
     endpoint: &SymbolEndpoint,
     paths: &[std::path::PathBuf],
     architecture: Option<&crate::manifest::ElfArchitecture>,
-) -> Result<bool> {
-    let object = elf::find_library(root, &endpoint.library, paths, architecture)?;
-    let info = elf::inspect(&object)?;
-    Ok(info
-        .exported
-        .contains(&(endpoint.symbol.clone(), endpoint.version.clone()))
-        || endpoint.version.is_none()
-            && info
-                .exported
-                .iter()
-                .any(|(name, _)| name == &endpoint.symbol))
+    libraries: &mut BTreeMap<String, Option<elf::ElfInfo>>,
+) -> bool {
+    if !libraries.contains_key(&endpoint.library) {
+        let library = match elf::find_library(root, &endpoint.library, paths, architecture) {
+            Ok(path) => {
+                eprintln!("[check] library {}: {}", endpoint.library, path.display());
+                elf::inspect(&path).ok()
+            }
+            Err(_) => None,
+        };
+        libraries.insert(endpoint.library.clone(), library);
+    }
+    libraries
+        .get(&endpoint.library)
+        .and_then(Option::as_ref)
+        .is_some_and(|info| {
+            info.exported
+                .contains(&(endpoint.symbol.clone(), endpoint.version.clone()))
+                || endpoint.version.is_none()
+                    && info
+                        .exported
+                        .iter()
+                        .any(|(name, _)| name == &endpoint.symbol)
+        })
 }
 
 pub fn run(args: CheckArgs) -> Result<()> {
@@ -30,7 +43,18 @@ pub fn run(args: CheckArgs) -> Result<()> {
     let mut errors = Vec::new();
     let referenced: BTreeSet<_> = reference.symbols.iter().cloned().collect();
     let mut mapped_sources = BTreeSet::new();
+    let mut libraries = BTreeMap::new();
+    let mut missing_targets = 0_usize;
     for (index, entry) in mapping.mappings.iter().enumerate() {
+        eprintln!(
+            "[check] unresolved function: from library={} symbol={} version={} -> to library={} symbol={} version={}",
+            entry.from.library,
+            entry.from.symbol,
+            entry.from.version.as_deref().unwrap_or("<unversioned>"),
+            entry.to.library,
+            entry.to.symbol,
+            entry.to.version.as_deref().unwrap_or("<unversioned>")
+        );
         let source = SymbolRef {
             library: entry.from.library.clone(),
             symbol: entry.from.symbol.clone(),
@@ -45,16 +69,20 @@ pub fn run(args: CheckArgs) -> Result<()> {
         if !mapped_sources.insert(source) {
             errors.push(format!("mapping #{index}: duplicate source mapping"));
         }
-        match endpoint_exists(
+        if !endpoint_exists(
             &args.target_sysroot,
             &entry.to,
             &args.system_lib_search_paths,
             reference.architecture.as_ref(),
+            &mut libraries,
         ) {
-            Ok(true) => {}
-            Ok(false) => errors.push(format!("mapping #{index}: target symbol is not exported")),
-            Err(e) => errors.push(format!("mapping #{index}: target: {e:#}")),
+            missing_targets += 1;
         }
+    }
+    if missing_targets > 0 {
+        errors.push(format!(
+            "{missing_targets} mapping target symbols are not exported; see the unresolved-function logs above"
+        ));
     }
     for required in &reference.symbols {
         let original = SymbolEndpoint {
@@ -62,14 +90,13 @@ pub fn run(args: CheckArgs) -> Result<()> {
             symbol: required.symbol.clone(),
             version: required.version.clone(),
         };
-        let missing = endpoint_exists(
+        let missing = !endpoint_exists(
             &args.target_sysroot,
             &original,
             &args.system_lib_search_paths,
             reference.architecture.as_ref(),
-        )
-        .map(|exists| !exists)
-        .unwrap_or(true);
+            &mut libraries,
+        );
         if missing && !mapped_sources.contains(required) {
             errors.push(format!(
                 "missing source mapping for {}/{}{}",
