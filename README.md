@@ -9,6 +9,13 @@ making ABI differences between source and target sysroots explicit.
 cargo build --release
 ```
 
+Or a musl-static build:
+
+```sh
+rustup target add x86_64-unknown-linux-musl
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
 ELF inspection is implemented in Rust. The `patch` command invokes
 [`patchelf`](https://github.com/NixOS/patchelf), which must be installed on the
 machine where patching is performed.
