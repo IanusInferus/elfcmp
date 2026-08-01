@@ -20,6 +20,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
     if !args.input.is_file() {
         bail!("input does not exist: {}", args.input.display());
     }
+    let input_architecture = elf::inspect(&args.input)?.architecture;
     let input_name = args
         .input
         .file_name()
@@ -78,7 +79,12 @@ pub fn run(args: CopyArgs) -> Result<()> {
             if !visited.insert(name.clone()) {
                 continue;
             }
-            let source = elf::find_library(&args.sysroot, &name, &args.system_lib_search_paths)?;
+            let source = elf::find_library(
+                &args.sysroot,
+                &name,
+                &args.system_lib_search_paths,
+                Some(&info.architecture),
+            )?;
             let dependency = elf::inspect(&source)?;
             if is_system_library(&name, &basenames) {
                 system_objects.insert(name, dependency);
@@ -120,6 +126,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
         &ReferenceTable {
             format: 1,
             input: input_name.to_string_lossy().into_owned(),
+            architecture: Some(input_architecture),
             symbols,
             objects: consumers,
         },

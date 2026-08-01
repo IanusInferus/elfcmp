@@ -10,8 +10,9 @@ fn endpoint_exists(
     root: &std::path::Path,
     endpoint: &SymbolEndpoint,
     paths: &[std::path::PathBuf],
+    architecture: Option<&crate::manifest::ElfArchitecture>,
 ) -> Result<bool> {
-    let object = elf::find_library(root, &endpoint.library, paths)?;
+    let object = elf::find_library(root, &endpoint.library, paths, architecture)?;
     let info = elf::inspect(&object)?;
     Ok(info
         .exported
@@ -48,6 +49,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
             &args.target_sysroot,
             &entry.to,
             &args.system_lib_search_paths,
+            reference.architecture.as_ref(),
         ) {
             Ok(true) => {}
             Ok(false) => errors.push(format!("mapping #{index}: target symbol is not exported")),
@@ -64,6 +66,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
             &args.target_sysroot,
             &original,
             &args.system_lib_search_paths,
+            reference.architecture.as_ref(),
         )
         .map(|exists| !exists)
         .unwrap_or(true);

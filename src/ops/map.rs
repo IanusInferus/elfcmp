@@ -13,6 +13,7 @@ pub fn run(args: MapArgs) -> Result<()> {
             &args.target_sysroot,
             &required.library,
             &args.system_lib_search_paths,
+            reference.architecture.as_ref(),
         )
         .and_then(|path| elf::inspect(&path))
         .map(|info| {

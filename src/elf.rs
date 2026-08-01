@@ -1,3 +1,4 @@
+use crate::manifest::ElfArchitecture;
 use anyhow::{bail, Context, Result};
 use goblin::elf::{section_header::SHT_GNU_VERSYM, sym, Elf};
 use std::{
@@ -8,6 +9,7 @@ use std::{
 
 #[derive(Debug)]
 pub struct ElfInfo {
+    pub architecture: ElfArchitecture,
     pub needed: Vec<String>,
     pub imported: BTreeSet<(String, Option<String>)>,
     pub exported: BTreeSet<(String, Option<String>)>,
@@ -53,6 +55,11 @@ pub fn inspect(path: &Path) -> Result<ElfInfo> {
         }
     }
     Ok(ElfInfo {
+        architecture: ElfArchitecture {
+            machine: elf.header.e_machine,
+            bits: if elf.is_64 { 64 } else { 32 },
+            endianness: if elf.little_endian { "little" } else { "big" }.to_owned(),
+        },
         needed: elf.libraries.iter().map(|s| (*s).to_owned()).collect(),
         imported,
         exported,
@@ -201,7 +208,13 @@ pub fn is_shared_library_filename(name: &str) -> bool {
     suffix_start > 1 && components[suffix_start - 1] == "so"
 }
 
-pub fn find_library(sysroot: &Path, name: &str, extra: &[PathBuf]) -> Result<PathBuf> {
+pub fn find_library(
+    sysroot: &Path,
+    name: &str,
+    extra: &[PathBuf],
+    expected_architecture: Option<&ElfArchitecture>,
+) -> Result<PathBuf> {
+    let mut incompatible = Vec::new();
     let paths = extra.iter().cloned().chain(default_search_paths());
     for directory in paths {
         let relative = if directory.is_absolute() {
@@ -213,7 +226,10 @@ pub fn find_library(sysroot: &Path, name: &str, extra: &[PathBuf]) -> Result<Pat
         };
         let candidate = sysroot.join(relative).join(name);
         if candidate.is_file() {
-            return Ok(candidate);
+            if library_architecture_matches(&candidate, expected_architecture) {
+                return Ok(candidate);
+            }
+            incompatible.push(candidate);
         }
     }
     // Multiarch directories are common and cheap to search one level deep.
@@ -222,15 +238,43 @@ pub fn find_library(sysroot: &Path, name: &str, extra: &[PathBuf]) -> Result<Pat
             for entry in entries.flatten().filter(|e| e.path().is_dir()) {
                 let candidate = entry.path().join(name);
                 if candidate.is_file() {
-                    return Ok(candidate);
+                    if library_architecture_matches(&candidate, expected_architecture) {
+                        return Ok(candidate);
+                    }
+                    incompatible.push(candidate);
                 }
             }
         }
     }
-    bail!(
-        "library {name} not found beneath sysroot {}",
-        sysroot.display()
-    )
+    if incompatible.is_empty() {
+        bail!(
+            "library {name} not found beneath sysroot {}",
+            sysroot.display()
+        )
+    } else {
+        bail!(
+            "library {name} has no matching architecture beneath sysroot {}; rejected: {}",
+            sysroot.display(),
+            incompatible
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+fn library_architecture_matches(path: &Path, expected: Option<&ElfArchitecture>) -> bool {
+    let Some(expected) = expected else {
+        return true;
+    };
+    inspect(path)
+        .map(|info| architectures_match(expected, &info.architecture))
+        .unwrap_or(false)
+}
+
+fn architectures_match(expected: &ElfArchitecture, actual: &ElfArchitecture) -> bool {
+    expected == actual
 }
 
 #[cfg(test)]
@@ -246,5 +290,30 @@ mod tests {
         assert!(!is_shared_library_filename("liba.so.debug"));
         assert!(!is_shared_library_filename("liba.so.1.debug"));
         assert!(!is_shared_library_filename("libapplication"));
+    }
+
+    #[test]
+    fn architecture_requires_machine_bitness_and_endianness() {
+        let x86_64 = ElfArchitecture {
+            machine: goblin::elf::header::EM_X86_64,
+            bits: 64,
+            endianness: "little".into(),
+        };
+        assert!(architectures_match(&x86_64, &x86_64));
+        assert!(!architectures_match(
+            &x86_64,
+            &ElfArchitecture {
+                machine: goblin::elf::header::EM_386,
+                bits: 32,
+                endianness: "little".into(),
+            }
+        ));
+        assert!(!architectures_match(
+            &x86_64,
+            &ElfArchitecture {
+                endianness: "big".into(),
+                ..x86_64
+            }
+        ));
     }
 }

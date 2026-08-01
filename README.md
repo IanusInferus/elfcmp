@@ -90,6 +90,10 @@ records imported symbols supplied by skipped system libraries.
   `usr/local/lib`, plus one-level multiarch directories beneath `lib` and
   `usr/lib`.
 
+  Candidate libraries must match the input ELF's machine architecture, bitness,
+  and endianness. A same-named library for another architecture is skipped; if
+  no compatible candidate exists, `elfcmp` reports the rejected paths.
+
 - `--reference` selects the reference-table output path. Its default is
   `OUTPUT/elfcmp-reference.yaml`, where `OUTPUT` is the `copy` destination. For
   an example destination `./executable-bundle`, the default is therefore

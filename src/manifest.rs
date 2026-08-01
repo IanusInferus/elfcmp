@@ -15,9 +15,18 @@ pub struct ReferenceTable {
     pub format: u32,
     #[serde(alias = "executable")]
     pub input: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub architecture: Option<ElfArchitecture>,
     pub symbols: BTreeSet<SymbolRef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub objects: Vec<ObjectReference>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ElfArchitecture {
+    pub machine: u16,
+    pub bits: u8,
+    pub endianness: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

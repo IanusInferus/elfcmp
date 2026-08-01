@@ -1,6 +1,9 @@
 #include <stdio.h>
 
-void elfcmp_library_hello(void) {
-    puts("hello from the shared-library bundle");
-}
+extern int elfcmp_dependency_value(void);
 
+void elfcmp_library_hello(void) {
+    if (elfcmp_dependency_value() == 42) {
+        puts("hello from the shared-library bundle");
+    }
+}
