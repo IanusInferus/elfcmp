@@ -8,7 +8,9 @@ libc.so.6/explicit_bzero@GLIBC_2.25
 ```
 
 `hello.c` is compiled against the Ubuntu sysroot and imports the versioned
-glibc symbol. `compat.c` provides a portable unversioned replacement. The test
+glibc symbol. `compat.c` provides the default versioned export
+`elfcmp_explicit_bzero@@COMPAT_1.0`; the mapping deliberately leaves the target
+version unspecified. The test
 verifies the CentOS comparison reports the original symbol as missing, checks
 the mapping, patches the copied bundle, confirms both `$ORIGIN` RPATHs, and
 executes the result.
@@ -26,4 +28,6 @@ bash integration/compat/test.sh
 ```
 
 `mapping-versioned.yaml` and `compat.map` are retained as negative-test inputs
-for rejecting a target version that is not already present in `.gnu.version_r`.
+for rejecting a target version name that is not already present anywhere in
+the object's `.gnu.version_r`. The providing library does not have to match the
+version-requirement library.

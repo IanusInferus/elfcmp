@@ -181,7 +181,8 @@ elfcmp check bundle/elfcmp-reference.yaml /target/sysroot mapping.yaml \
 target-missing reference has a mapping, mappings do not duplicate a source, and
 each target library exports the requested function and version. For versioned
 targets it also verifies that every affected object can reuse the target
-library/version requirement recorded by `copy`.
+version name from a requirement recorded by `copy`. The library associated
+with that existing requirement may differ from the mapped target library.
 
 A source sysroot and bundle path are not needed: the required functions,
 per-object imports, and existing version requirements are already stored in
@@ -225,10 +226,12 @@ performs RPATH-only patching:
 elfcmp patch ./bundle
 ```
 
-For a versioned replacement, the target library/version pair must already occur
-in each importing object's `.gnu.version_r` table. `check` reports mappings that
-cannot reuse such an entry, and `patch` repeats the check before changing any
-file. In the supported case, `elfcmp` rewrites the existing 16-bit
+For a versioned replacement, the target version name must already occur in each
+importing object's `.gnu.version_r` table; it may be associated with any
+library. `check` reports mappings that cannot reuse such an entry, and `patch`
+repeats the check before changing any file. The mapped target library must still
+export the mapped symbol at that exact version. In the supported case, `elfcmp`
+rewrites the existing 16-bit
 `.gnu.version` index without resizing the ELF. Unversioned targets use the global
 version index. Adding brand-new `.gnu.version_r` records is not yet supported.
 

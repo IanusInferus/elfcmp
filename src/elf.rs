@@ -109,21 +109,16 @@ pub fn rewrite_existing_versions(
                 .as_ref()
                 .and_then(|section| {
                     section.iter().find_map(|need| {
-                        (elf.dynstrtab.get_at(need.vn_file) == Some(mapping.to.library.as_str()))
-                            .then(|| {
-                                need.iter().find_map(|aux| {
-                                    (elf.dynstrtab.get_at(aux.vna_name) == Some(version.as_str()))
-                                        .then_some(aux.vna_other & 0x7fff)
-                                })
-                            })
-                            .flatten()
+                        need.iter().find_map(|aux| {
+                            (elf.dynstrtab.get_at(aux.vna_name) == Some(version.as_str()))
+                                .then_some(aux.vna_other & 0x7fff)
+                        })
                     })
                 })
                 .with_context(|| {
                     format!(
-                        "target version {} from {} is not already required by {}",
+                        "target version {} is not already required by {}",
                         version,
-                        mapping.to.library,
                         path.display()
                     )
                 })?,
@@ -213,6 +208,12 @@ pub fn exports_symbol(info: &ElfInfo, symbol: &str, required_version: Option<&st
         exported == symbol
             && required_version.is_none_or(|required| version.as_deref() == Some(required))
     })
+}
+
+pub fn required_version_index(info: &ElfInfo, version: &str) -> Option<u16> {
+    info.required_versions
+        .iter()
+        .find_map(|((_, required), index)| (required == version).then_some(*index))
 }
 
 pub fn find_library(
@@ -343,5 +344,24 @@ mod tests {
         assert!(exports_symbol(&info, "function", Some("VERSION_1")));
         assert!(!exports_symbol(&info, "function", Some("VERSION_2")));
         assert!(!exports_symbol(&info, "other", None));
+    }
+
+    #[test]
+    fn version_index_can_be_reused_from_another_library() {
+        let mut required_versions = BTreeMap::new();
+        required_versions.insert(("libc.so.6".to_owned(), "GLIBC_2.2.5".to_owned()), 3);
+        let info = ElfInfo {
+            architecture: ElfArchitecture {
+                machine: goblin::elf::header::EM_X86_64,
+                bits: 64,
+                endianness: "little".into(),
+            },
+            needed: Vec::new(),
+            imported: BTreeSet::new(),
+            exported: BTreeSet::new(),
+            required_versions,
+        };
+        assert_eq!(required_version_index(&info, "GLIBC_2.2.5"), Some(3));
+        assert_eq!(required_version_index(&info, "GLIBC_2.34"), None);
     }
 }
