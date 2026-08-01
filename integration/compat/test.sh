@@ -16,7 +16,12 @@ cp -L "$CENTOS_LIBC" "$TEST_TMP/target/lib64/libc.so.6"
 ubuntu_cc -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wall -Wextra \
     "$TEST_DIR/hello.c" -o "$TEST_TMP/build/hello"
 ubuntu_cc -O2 -Wall -Wextra -fPIC -shared "$TEST_DIR/compat.c" \
-    -Wl,-soname,libcompat.so.1 -o "$TEST_TMP/target/lib64/libcompat.so.1"
+    -Wl,-soname,libcompat.so.1 -Wl,--version-script="$TEST_DIR/compat.map" \
+    -o "$TEST_TMP/target/lib64/libcompat.so.1"
+
+"$READELF" --dyn-syms --wide "$TEST_TMP/target/lib64/libcompat.so.1" \
+    >"$TEST_TMP/compat-symbols.txt"
+assert_contains "$TEST_TMP/compat-symbols.txt" "elfcmp_explicit_bzero@@COMPAT_1.0"
 
 "$READELF" --dyn-syms --wide "$TEST_TMP/build/hello" >"$TEST_TMP/symbols_before.txt"
 assert_contains "$TEST_TMP/symbols_before.txt" "explicit_bzero@GLIBC_2.25"
@@ -46,4 +51,4 @@ fi
 [[ $($PATCHELF --print-rpath "$TEST_TMP/bundle/lib/libcompat.so.1") == '$ORIGIN' ]]
 "$TEST_TMP/bundle/hello" | grep -Fx "hello from elfcmp"
 
-echo "PASS: versioned explicit_bzero mapped to an unversioned compatibility symbol"
+echo "PASS: versioned explicit_bzero mapped through an unversioned requirement to a versioned default export"

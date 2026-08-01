@@ -208,6 +208,13 @@ pub fn is_shared_library_filename(name: &str) -> bool {
     suffix_start > 1 && components[suffix_start - 1] == "so"
 }
 
+pub fn exports_symbol(info: &ElfInfo, symbol: &str, required_version: Option<&str>) -> bool {
+    info.exported.iter().any(|(exported, version)| {
+        exported == symbol
+            && required_version.is_none_or(|required| version.as_deref() == Some(required))
+    })
+}
+
 pub fn find_library(
     sysroot: &Path,
     name: &str,
@@ -315,5 +322,26 @@ mod tests {
                 ..x86_64
             }
         ));
+    }
+
+    #[test]
+    fn unversioned_requirement_matches_versioned_export() {
+        let mut exported = BTreeSet::new();
+        exported.insert(("function".to_owned(), Some("VERSION_1".to_owned())));
+        let info = ElfInfo {
+            architecture: ElfArchitecture {
+                machine: goblin::elf::header::EM_X86_64,
+                bits: 64,
+                endianness: "little".into(),
+            },
+            needed: Vec::new(),
+            imported: BTreeSet::new(),
+            exported,
+            required_versions: BTreeMap::new(),
+        };
+        assert!(exports_symbol(&info, "function", None));
+        assert!(exports_symbol(&info, "function", Some("VERSION_1")));
+        assert!(!exports_symbol(&info, "function", Some("VERSION_2")));
+        assert!(!exports_symbol(&info, "other", None));
     }
 }

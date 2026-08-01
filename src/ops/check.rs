@@ -27,13 +27,7 @@ fn endpoint_exists(
         .get(&endpoint.library)
         .and_then(Option::as_ref)
         .is_some_and(|info| {
-            info.exported
-                .contains(&(endpoint.symbol.clone(), endpoint.version.clone()))
-                || endpoint.version.is_none()
-                    && info
-                        .exported
-                        .iter()
-                        .any(|(name, _)| name == &endpoint.symbol)
+            elf::exports_symbol(info, &endpoint.symbol, endpoint.version.as_deref())
         })
 }
 
@@ -46,15 +40,6 @@ pub fn run(args: CheckArgs) -> Result<()> {
     let mut libraries = BTreeMap::new();
     let mut missing_targets = 0_usize;
     for (index, entry) in mapping.mappings.iter().enumerate() {
-        eprintln!(
-            "[check] unresolved function: from library={} symbol={} version={} -> to library={} symbol={} version={}",
-            entry.from.library,
-            entry.from.symbol,
-            entry.from.version.as_deref().unwrap_or("<unversioned>"),
-            entry.to.library,
-            entry.to.symbol,
-            entry.to.version.as_deref().unwrap_or("<unversioned>")
-        );
         let source = SymbolRef {
             library: entry.from.library.clone(),
             symbol: entry.from.symbol.clone(),
@@ -77,6 +62,15 @@ pub fn run(args: CheckArgs) -> Result<()> {
             &mut libraries,
         ) {
             missing_targets += 1;
+            eprintln!(
+                "[check] unresolved function: from library={} symbol={} version={} -> to library={} symbol={} version={}",
+                entry.from.library,
+                entry.from.symbol,
+                entry.from.version.as_deref().unwrap_or("<unversioned>"),
+                entry.to.library,
+                entry.to.symbol,
+                entry.to.version.as_deref().unwrap_or("<unversioned>")
+            );
         }
     }
     if missing_targets > 0 {

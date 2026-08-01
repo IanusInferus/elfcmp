@@ -30,8 +30,7 @@ pub fn run(args: MapArgs) -> Result<()> {
             .get(&required.library)
             .and_then(Option::as_ref)
             .is_some_and(|info| {
-                info.exported
-                    .contains(&(required.symbol.clone(), required.version.clone()))
+                elf::exports_symbol(info, &required.symbol, required.version.as_deref())
             });
         if !present {
             let endpoint = SymbolEndpoint {

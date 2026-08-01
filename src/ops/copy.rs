@@ -106,12 +106,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
             let symbol = &import.symbol;
             let version = &import.version;
             for (library, provider) in &system_objects {
-                if provider
-                    .exported
-                    .contains(&(symbol.clone(), version.clone()))
-                    || (version.is_none()
-                        && provider.exported.iter().any(|(name, _)| name == symbol))
-                {
+                if elf::exports_symbol(provider, symbol, version.as_deref()) {
                     symbols.insert(SymbolRef {
                         library: library.clone(),
                         symbol: symbol.to_owned(),

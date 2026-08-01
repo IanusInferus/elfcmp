@@ -187,6 +187,12 @@ A source sysroot and bundle path are not needed: the required functions,
 per-object imports, and existing version requirements are already stored in
 `REFERENCE`.
 
+An unversioned symbol requirement matches an export of the same name whether
+that export is unversioned or versioned. A versioned requirement still requires
+the exact requested version. The same rule is used by `map`, `check`, and
+`patch`; an unversioned requirement is not reported as unresolved merely because
+the providing library exposes the symbol with a version.
+
 ### 3. Patch
 
 Patch syntax:
