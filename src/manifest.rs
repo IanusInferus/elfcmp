@@ -13,7 +13,8 @@ pub struct SymbolRef {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReferenceTable {
     pub format: u32,
-    pub executable: String,
+    #[serde(alias = "executable")]
+    pub input: String,
     pub symbols: BTreeSet<SymbolRef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub objects: Vec<ObjectReference>,

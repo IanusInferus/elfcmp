@@ -184,6 +184,23 @@ pub fn default_search_paths() -> Vec<PathBuf> {
         .collect()
 }
 
+pub fn is_shared_library_filename(name: &str) -> bool {
+    if !name.starts_with("lib") {
+        return false;
+    }
+    let components: Vec<_> = name.split('.').collect();
+    let mut suffix_start = components.len();
+    while suffix_start > 0
+        && !components[suffix_start - 1].is_empty()
+        && components[suffix_start - 1]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+    {
+        suffix_start -= 1;
+    }
+    suffix_start > 1 && components[suffix_start - 1] == "so"
+}
+
 pub fn find_library(sysroot: &Path, name: &str, extra: &[PathBuf]) -> Result<PathBuf> {
     let paths = extra.iter().cloned().chain(default_search_paths());
     for directory in paths {
@@ -214,4 +231,20 @@ pub fn find_library(sysroot: &Path, name: &str, extra: &[PathBuf]) -> Result<Pat
         "library {name} not found beneath sysroot {}",
         sysroot.display()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_library_filename_supports_dotted_names_and_versions() {
+        assert!(is_shared_library_filename("liba.b.c.so.1.2.3"));
+        assert!(is_shared_library_filename("liba.so"));
+        assert!(is_shared_library_filename("liba.so.1"));
+        assert!(!is_shared_library_filename("a.b.c.so.1.2.3"));
+        assert!(!is_shared_library_filename("liba.so.debug"));
+        assert!(!is_shared_library_filename("liba.so.1.debug"));
+        assert!(!is_shared_library_filename("libapplication"));
+    }
 }

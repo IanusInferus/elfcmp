@@ -20,33 +20,66 @@ machine where patching is performed.
 Copy syntax:
 
 ```text
-elfcmp copy EXECUTABLE OUTPUT \
+elfcmp copy INPUT OUTPUT \
   [--sysroot SYSROOT] \
   [--system-lib-search-paths PATHS] \
   [--system-lib-basenames BASENAMES] \
   [--reference REFERENCE]
 ```
 
-Example:
+Executable example:
 
 ```sh
-elfcmp copy ./my-program ./bundle \
+elfcmp copy ./my-program ./executable-bundle \
   --sysroot /source/sysroot \
   --system-lib-search-paths /lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu \
-  --reference ./bundle/elfcmp-reference.yaml
+  --reference ./executable-bundle/elfcmp-reference.yaml
 ```
 
-The executable is copied to `bundle/`, non-system dependencies are recursively
-copied to `bundle/lib/`, and `bundle/elfcmp-reference.yaml` records imported
-symbols supplied by skipped system libraries.
+This produces:
 
-- `EXECUTABLE` is the ELF executable to scan and copy. It has no default.
+```text
+executable-bundle/
+├── my-program
+├── elfcmp-reference.yaml
+└── lib/
+    ├── libdependency-a.so.1
+    └── libdependency-b.so.2
+```
+
+Dynamic-library example:
+
+```sh
+elfcmp copy ./liba.b.c.so.1.2.3 ./library-bundle \
+  --sysroot /source/sysroot \
+  --system-lib-search-paths /lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu \
+  --reference ./library-bundle/elfcmp-reference.yaml
+```
+
+This produces a flat bundle without an additional `lib/` directory:
+
+```text
+library-bundle/
+├── liba.b.c.so.1.2.3
+├── elfcmp-reference.yaml
+├── libdependency-a.so.1
+└── libdependency-b.so.2
+```
+
+In both layouts, dependencies are resolved recursively and the reference table
+records imported symbols supplied by skipped system libraries.
+
+- `INPUT` is the ELF executable or shared library to scan and copy. It has no
+  default. A filename matching `lib<name>.so` followed by optional numeric
+  version components, such as `liba.b.c.so.1.2.3`, is treated as a shared
+  library.
 
 - `OUTPUT` is the bundle destination. It has no default. The executable is
-  copied to the root of this directory and copied shared libraries are placed
-  in `OUTPUT/lib/`.
+  copied to its root and dependencies to `OUTPUT/lib/`. For a shared-library
+  input, the input and its dependencies are all copied directly to the `OUTPUT`
+  root; no additional `lib/` directory is created.
 
-- `--sysroot` selects the root filesystem used to resolve the executable's
+- `--sysroot` selects the root filesystem used to resolve the input's
   dependencies. Its default is `/`, which uses the current system root.
 
 - `--system-lib-search-paths` supplies additional colon-separated library
@@ -59,8 +92,8 @@ symbols supplied by skipped system libraries.
 
 - `--reference` selects the reference-table output path. Its default is
   `OUTPUT/elfcmp-reference.yaml`, where `OUTPUT` is the `copy` destination. For
-  the example destination `./bundle`, the default is therefore already
-  `./bundle/elfcmp-reference.yaml`.
+  an example destination `./executable-bundle`, the default is therefore
+  `./executable-bundle/elfcmp-reference.yaml`.
 
 - `--system-lib-basenames` identifies system libraries that are referenced but
   not copied. Its default is

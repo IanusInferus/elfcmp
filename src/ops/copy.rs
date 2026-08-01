@@ -17,35 +17,43 @@ const SYSTEM_LIB_BASENAMES: &[&str] =
     &["libc", "libdl", "libm", "libpthread", "librt", "libselinux"];
 
 pub fn run(args: CopyArgs) -> Result<()> {
-    if !args.executable.is_file() {
-        bail!("executable does not exist: {}", args.executable.display());
+    if !args.input.is_file() {
+        bail!("input does not exist: {}", args.input.display());
     }
-    fs::create_dir_all(args.output.join("lib"))
-        .with_context(|| format!("creating {}", args.output.display()))?;
-    let executable_name = args
-        .executable
+    let input_name = args
+        .input
         .file_name()
-        .context("executable path has no file name")?;
-    copy_file(&args.executable, &args.output.join(executable_name))?;
+        .context("input path has no file name")?;
+    let input_is_library = elf::is_shared_library_filename(&input_name.to_string_lossy());
+    let dependency_directory = if input_is_library {
+        args.output.clone()
+    } else {
+        args.output.join("lib")
+    };
+    fs::create_dir_all(&dependency_directory)
+        .with_context(|| format!("creating {}", dependency_directory.display()))?;
+    copy_file(&args.input, &args.output.join(input_name))?;
 
     let basenames = system_lib_basenames(args.system_lib_basenames);
-    let mut queue = VecDeque::from([args.executable.clone()]);
+    let mut queue = VecDeque::from([args.input.clone()]);
     let mut visited = BTreeSet::new();
     let mut system_objects = BTreeMap::new();
     let mut consumers = Vec::new();
 
     while let Some(object) = queue.pop_front() {
         let info = elf::inspect(&object)?;
-        let object_name = if object == args.executable {
-            executable_name.to_string_lossy().into_owned()
+        let object_name = if object == args.input {
+            input_name.to_string_lossy().into_owned()
         } else {
-            format!(
-                "lib/{}",
-                object
-                    .file_name()
-                    .context("dependency path has no file name")?
-                    .to_string_lossy()
-            )
+            let dependency_name = object
+                .file_name()
+                .context("dependency path has no file name")?
+                .to_string_lossy();
+            if input_is_library {
+                dependency_name.into_owned()
+            } else {
+                format!("lib/{dependency_name}")
+            }
         };
         consumers.push(ObjectReference {
             object: object_name,
@@ -75,7 +83,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
             if is_system_library(&name, &basenames) {
                 system_objects.insert(name, dependency);
             } else {
-                let destination = args.output.join("lib").join(&name);
+                let destination = dependency_directory.join(&name);
                 copy_file(&source, &destination)?;
                 queue.push_back(source);
             }
@@ -111,7 +119,7 @@ pub fn run(args: CopyArgs) -> Result<()> {
         &reference_path,
         &ReferenceTable {
             format: 1,
-            executable: executable_name.to_string_lossy().into_owned(),
+            input: input_name.to_string_lossy().into_owned(),
             symbols,
             objects: consumers,
         },

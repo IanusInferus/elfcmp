@@ -111,8 +111,10 @@ pub fn run(args: PatchArgs) -> Result<()> {
                 }
             }
         }
-        let in_lib = object.parent().is_some_and(|p| p.ends_with("lib"));
-        let rpath = if in_lib { "$ORIGIN" } else { "$ORIGIN/lib" };
+        let is_library = object
+            .file_name()
+            .is_some_and(|name| elf::is_shared_library_filename(&name.to_string_lossy()));
+        let rpath = if is_library { "$ORIGIN" } else { "$ORIGIN/lib" };
         invoke(
             &args.patchelf,
             &[

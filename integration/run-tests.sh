@@ -17,5 +17,6 @@ fi
 
 bash "$SCRIPT_DIR/compat/test.sh"
 bash "$SCRIPT_DIR/dlopen/test.sh"
+bash "$SCRIPT_DIR/library/test.sh"
 
 echo "All elfcmp integration tests passed."

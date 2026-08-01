@@ -22,9 +22,9 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct CopyArgs {
-    /// ELF executable to bundle.
-    pub executable: PathBuf,
-    /// Destination directory (the executable is placed at its root and DSOs in lib/).
+    /// ELF executable or shared library to bundle.
+    pub input: PathBuf,
+    /// Destination directory.
     pub output: PathBuf,
     /// Source sysroot. Defaults to /.
     #[arg(long, default_value = "/")]

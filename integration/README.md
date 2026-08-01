@@ -120,11 +120,13 @@ Or run them separately:
 ```bash
 bash integration/compat/test.sh
 bash integration/dlopen/test.sh
+bash integration/library/test.sh
 ```
 
 The first test maps `explicit_bzero@GLIBC_2.25` to an unversioned compatibility
 symbol. The second maps `dlopen@GLIBC_2.34` to the existing
-`libdl.so.2/dlopen@GLIBC_2.2.5` version requirement.
+`libdl.so.2/dlopen@GLIBC_2.2.5` version requirement. The third verifies that a
+versioned shared-library input is copied into a flat bundle without `lib/`.
 
 Each test creates a unique `integration/.elfcmp-test.*` directory and prints its
 path before building. The directory is deliberately retained after success,
