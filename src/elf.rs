@@ -122,15 +122,20 @@ pub fn rewrite_existing_versions(
                 .as_ref()
                 .and_then(|section| {
                     section.iter().find_map(|need| {
-                        need.iter().find_map(|aux| {
-                            (elf.dynstrtab.get_at(aux.vna_name) == Some(version.as_str()))
-                                .then_some(aux.vna_other & 0x7fff)
-                        })
+                        (elf.dynstrtab.get_at(need.vn_file) == Some(mapping.to.library.as_str()))
+                            .then(|| {
+                                need.iter().find_map(|aux| {
+                                    (elf.dynstrtab.get_at(aux.vna_name) == Some(version.as_str()))
+                                        .then_some(aux.vna_other & 0x7fff)
+                                })
+                            })
+                            .flatten()
                     })
                 })
                 .with_context(|| {
                     format!(
-                        "target version {} is not already required by {}",
+                        "target version {}/{} is not already required by {}",
+                        mapping.to.library,
                         version,
                         path.display()
                     )
@@ -381,10 +386,10 @@ pub fn exports_symbol(info: &ElfInfo, symbol: &str, required_version: Option<&st
     })
 }
 
-pub fn required_version_index(info: &ElfInfo, version: &str) -> Option<u16> {
+pub fn required_version_index(info: &ElfInfo, library: &str, version: &str) -> Option<u16> {
     info.required_versions
-        .iter()
-        .find_map(|((_, required), index)| (required == version).then_some(*index))
+        .get(&(library.to_owned(), version.to_owned()))
+        .copied()
 }
 
 pub fn find_library(
@@ -551,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn version_index_can_be_reused_from_another_library() {
+    fn version_index_requires_the_target_library() {
         let mut required_versions = BTreeMap::new();
         required_versions.insert(("libc.so.6".to_owned(), "GLIBC_2.2.5".to_owned()), 3);
         let info = ElfInfo {
@@ -567,7 +572,13 @@ mod tests {
             required_versions,
             runpaths: Vec::new(),
         };
-        assert_eq!(required_version_index(&info, "GLIBC_2.2.5"), Some(3));
-        assert_eq!(required_version_index(&info, "GLIBC_2.34"), None);
+        assert_eq!(
+            required_version_index(&info, "libc.so.6", "GLIBC_2.2.5"),
+            Some(3)
+        );
+        assert_eq!(
+            required_version_index(&info, "libpthread.so.0", "GLIBC_2.2.5"),
+            None
+        );
     }
 }

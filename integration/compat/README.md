@@ -28,6 +28,5 @@ bash integration/compat/test.sh
 ```
 
 `mapping-versioned.yaml` and `compat.map` are retained as negative-test inputs
-for rejecting a target version name that is not already present anywhere in
-the object's `.gnu.version_r`. The providing library does not have to match the
-version-requirement library.
+for rejecting a target library/version pair that is not already present in the
+object's `.gnu.version_r`.

@@ -82,14 +82,12 @@ pub fn run(args: CheckArgs) -> Result<()> {
             });
             if applies {
                 if let Some(version) = &entry.to.version {
-                    if !object
-                        .required_versions
-                        .iter()
-                        .any(|requirement| requirement.version == *version)
-                    {
+                    if !object.required_versions.iter().any(|requirement| {
+                        requirement.library == entry.to.library && requirement.version == *version
+                    }) {
                         errors.push(format!(
-                            "mapping #{index}: {} does not already require version {}",
-                            object.object, version
+                            "mapping #{index}: {} does not already require {}/{}",
+                            object.object, entry.to.library, version
                         ));
                     }
                 }

@@ -203,8 +203,7 @@ elfcmp check bundle/elfcmp-reference.yaml /target/sysroot mapping.yaml \
 target-missing reference has a mapping, mappings do not duplicate a source, and
 each target library exports the requested function and version. For versioned
 targets it also verifies that every affected object can reuse the target
-version name from a requirement recorded by `copy`. The library associated
-with that existing requirement may differ from the mapped target library.
+library/version requirement recorded by `copy`.
 
 A source sysroot and bundle path are not needed: the required functions,
 per-object imports, and existing version requirements are already stored in
@@ -265,14 +264,43 @@ performs RPATH-only patching:
 elfcmp patch ./bundle
 ```
 
-For a versioned replacement, the target version name must already occur in each
-importing object's `.gnu.version_r` table; it may be associated with any
-library. `check` reports mappings that cannot reuse such an entry, and `patch`
-repeats the check before changing any file. The mapped target library must still
-export the mapped symbol at that exact version. In the supported case, `elfcmp`
-rewrites the existing 16-bit
-`.gnu.version` index without resizing the ELF. Unversioned targets use the global
-version index. Adding brand-new `.gnu.version_r` records is not yet supported.
+For a versioned replacement, the target library/version pair must already occur
+in each importing object's `.gnu.version_r` table. `check` reports mappings that
+cannot reuse such an entry, and `patch` repeats the check before changing any
+file. The mapped target library must still export the mapped symbol at that
+exact version. In the supported case, `elfcmp` rewrites the existing 16-bit
+`.gnu.version` index without resizing the ELF. Unversioned targets use the
+global version index. Adding brand-new `.gnu.version_r` records is not yet
+supported.
+
+The library is part of this constraint. A `GLIBC_2.2.5` requirement associated
+with `libpthread.so.0` cannot be reused for a symbol mapped to `libm.so.6`, even
+if both libraries export symbols under `GLIBC_2.2.5`. For example, this mapping
+is supported only when the importing object already requires the exact pair
+`libm.so.6/GLIBC_2.2.5`:
+
+```yaml
+to:
+  library: libm.so.6
+  symbol: expf
+  version: GLIBC_2.2.5
+```
+
+If the exact target library/version pair is unavailable, the target must
+currently be unversioned. Omit `to.version`, commonly when mapping to a shipped
+compatibility library:
+
+```yaml
+to:
+  library: libcompat.so.1
+  symbol: expf_compat
+```
+
+An unversioned import can bind either to an unversioned export or to a default
+version export such as `expf_compat@@COMPAT_1.0`. By contrast, explicitly
+setting `version: COMPAT_1.0` requires an existing
+`libcompat.so.1/COMPAT_1.0` entry in every affected importing object's
+`.gnu.version_r` table.
 
 After rewriting the symbol-version indices, `patch` also removes version
 requirements no longer referenced by any undefined dynamic symbol. It relinks

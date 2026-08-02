@@ -125,8 +125,8 @@ bash integration/library/test.sh
 
 The first test maps `explicit_bzero@GLIBC_2.25` to an unversioned compatibility
 symbol. The second maps `dlopen@GLIBC_2.34` to
-`libdl.so.2/dlopen@GLIBC_2.2.5`, reusing a `GLIBC_2.2.5` version index that was
-recorded for another library. The third verifies that a
+`libdl.so.2/dlopen@GLIBC_2.2.5`, reusing the exact existing
+`libdl.so.2/GLIBC_2.2.5` version requirement. The third verifies that a
 versioned shared-library input is copied into a flat bundle without `lib/`.
 
 Each test creates a unique `integration/.elfcmp-test.*` directory and prints its

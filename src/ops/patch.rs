@@ -100,10 +100,12 @@ pub fn run(args: PatchArgs) -> Result<()> {
                     .contains(&(entry.from.symbol.clone(), entry.from.version.clone()))
                 {
                     if let Some(version) = &entry.to.version {
-                        if elf::required_version_index(&info, version).is_none() {
+                        if elf::required_version_index(&info, &entry.to.library, version).is_none()
+                        {
                             bail!(
-                                "cannot patch {}: target version {} is not an existing requirement",
+                                "cannot patch {}: target version {}/{} is not an existing requirement",
                                 object.display(),
+                                entry.to.library,
                                 version
                             );
                         }
