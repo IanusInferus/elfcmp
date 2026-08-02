@@ -30,6 +30,67 @@ pub fn run(args: PatchArgs) -> Result<()> {
         bail!("no ELF files found in {}", args.directory.display());
     }
     if let Some(mapping) = &mapping {
+        let validate_targets = args.target_sysroot.is_some()
+            || !args.system_lib_search_paths.is_empty()
+            || !args.lib_search_paths.is_empty();
+        if validate_targets {
+            let target_sysroot = args
+                .target_sysroot
+                .as_deref()
+                .unwrap_or_else(|| Path::new("/"));
+            let architecture = objects
+                .first()
+                .map(|object| elf::inspect(object).map(|info| info.architecture))
+                .transpose()?;
+            let mut checked = BTreeSet::new();
+            let mut target_libraries = BTreeMap::new();
+            for entry in &mapping.mappings {
+                if !checked.insert((
+                    entry.to.library.clone(),
+                    entry.to.symbol.clone(),
+                    entry.to.version.clone(),
+                )) {
+                    continue;
+                }
+                if !target_libraries.contains_key(&entry.to.library) {
+                    let path = elf::find_host_library(
+                        &entry.to.library,
+                        &args.lib_search_paths,
+                        architecture.as_ref(),
+                    )
+                    .or_else(|_| {
+                        elf::find_library(
+                            target_sysroot,
+                            &entry.to.library,
+                            &args.system_lib_search_paths,
+                            architecture.as_ref(),
+                        )
+                    })?;
+                    eprintln!("[patch] library {}: {}", entry.to.library, path.display());
+                    target_libraries.insert(
+                        entry.to.library.clone(),
+                        (path.clone(), elf::inspect(&path)?),
+                    );
+                }
+                let (path, info) = target_libraries
+                    .get(&entry.to.library)
+                    .expect("target library was inserted above");
+                if !elf::exports_symbol(&info, &entry.to.symbol, entry.to.version.as_deref()) {
+                    bail!(
+                        "mapping target {}/{}{} is not exported by {}",
+                        entry.to.library,
+                        entry.to.symbol,
+                        entry
+                            .to
+                            .version
+                            .as_ref()
+                            .map(|version| format!("@{version}"))
+                            .unwrap_or_default(),
+                        path.display()
+                    );
+                }
+            }
+        }
         // Validate every object before patchelf can mutate the first one.
         for object in &objects {
             let info = elf::inspect(object)?;

@@ -12,12 +12,19 @@ pub fn run(args: MapArgs) -> Result<()> {
     let mut libraries = BTreeMap::new();
     for required in &reference.symbols {
         if !libraries.contains_key(&required.library) {
-            let library = match elf::find_library(
-                &args.target_sysroot,
+            let library = match elf::find_host_library(
                 &required.library,
-                &args.system_lib_search_paths,
+                &args.lib_search_paths,
                 reference.architecture.as_ref(),
-            ) {
+            )
+            .or_else(|_| {
+                elf::find_library(
+                    &args.target_sysroot,
+                    &required.library,
+                    &args.system_lib_search_paths,
+                    reference.architecture.as_ref(),
+                )
+            }) {
                 Ok(path) => {
                     eprintln!("[map] library {}: {}", required.library, path.display());
                     elf::inspect(&path).ok()

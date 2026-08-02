@@ -4,7 +4,7 @@ TEST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "$TEST_DIR/../common.sh"
 
 build_elfcmp
-mkdir -p "$TEST_TMP/build" "$TEST_TMP/target/lib64"
+mkdir -p "$TEST_TMP/build" "$TEST_TMP/host-lib" "$TEST_TMP/target/lib64"
 CENTOS_LIBC=$(find "$CENTOS_SYSROOT" \( -type f -o -type l \) -name libc.so.6 \
     -print -quit)
 if [[ -z $CENTOS_LIBC ]]; then
@@ -17,9 +17,9 @@ ubuntu_cc -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -Wall -Wextra \
     "$TEST_DIR/hello.c" -o "$TEST_TMP/build/hello"
 ubuntu_cc -O2 -Wall -Wextra -fPIC -shared "$TEST_DIR/compat.c" \
     -Wl,-soname,libcompat.so.1 -Wl,--version-script="$TEST_DIR/compat.map" \
-    -o "$TEST_TMP/target/lib64/libcompat.so.1"
+    -o "$TEST_TMP/host-lib/libcompat.so.1"
 
-"$READELF" --dyn-syms --wide "$TEST_TMP/target/lib64/libcompat.so.1" \
+"$READELF" --dyn-syms --wide "$TEST_TMP/host-lib/libcompat.so.1" \
     >"$TEST_TMP/compat-symbols.txt"
 assert_contains "$TEST_TMP/compat-symbols.txt" "elfcmp_explicit_bzero@@COMPAT_1.0"
 
@@ -35,11 +35,14 @@ assert_contains "$TEST_TMP/symbols_before.txt" "explicit_bzero@GLIBC_2.25"
 assert_contains "$TEST_TMP/mapping-template.yaml" "symbol: explicit_bzero"
 assert_contains "$TEST_TMP/mapping-template.yaml" "version: GLIBC_2.25"
 
-cp "$TEST_TMP/target/lib64/libcompat.so.1" "$TEST_TMP/bundle/lib/"
+cp "$TEST_TMP/host-lib/libcompat.so.1" "$TEST_TMP/bundle/lib/"
 "$ELFCMP" check "$TEST_TMP/bundle/elfcmp-reference.yaml" "$TEST_TMP/target" \
-    "$TEST_DIR/mapping.yaml" --system-lib-search-paths /lib64
+    "$TEST_DIR/mapping.yaml" --system-lib-search-paths /lib64 \
+    --lib-search-paths "$TEST_TMP/host-lib"
 "$ELFCMP" patch "$TEST_TMP/bundle" --mapping "$TEST_DIR/mapping.yaml" \
-    --patchelf "$PATCHELF"
+    --patchelf "$PATCHELF" --target-sysroot "$TEST_TMP/target" \
+    --system-lib-search-paths /lib64 \
+    --lib-search-paths "$TEST_TMP/host-lib"
 
 "$READELF" --dyn-syms --wide "$TEST_TMP/bundle/hello" >"$TEST_TMP/symbols_after.txt"
 assert_contains "$TEST_TMP/symbols_after.txt" "UND elfcmp_explicit_bzero"

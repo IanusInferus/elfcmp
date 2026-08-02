@@ -282,6 +282,34 @@ pub fn find_library(
     }
 }
 
+pub fn find_host_library(
+    name: &str,
+    directories: &[PathBuf],
+    expected_architecture: Option<&ElfArchitecture>,
+) -> Result<PathBuf> {
+    let mut incompatible = Vec::new();
+    for directory in directories {
+        let candidate = directory.join(name);
+        if candidate.is_file() {
+            if library_architecture_matches(&candidate, expected_architecture) {
+                return Ok(candidate);
+            }
+            incompatible.push(candidate);
+        }
+    }
+    if incompatible.is_empty() {
+        bail!("host library {name} not found in the configured paths")
+    }
+    bail!(
+        "host library {name} has no matching architecture; rejected: {}",
+        incompatible
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 pub(crate) fn library_architecture_matches(
     path: &Path,
     expected: Option<&ElfArchitecture>,

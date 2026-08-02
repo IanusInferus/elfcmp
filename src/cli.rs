@@ -51,6 +51,9 @@ pub struct MapArgs {
     /// Additional colon-separated library directories inside the target sysroot.
     #[arg(long, value_delimiter = ':')]
     pub system_lib_search_paths: Vec<PathBuf>,
+    /// Additional colon-separated library directories on the host.
+    #[arg(long, value_delimiter = ':')]
+    pub lib_search_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -64,6 +67,9 @@ pub struct CheckArgs {
     /// Additional colon-separated library directories inside the target sysroot.
     #[arg(long, value_delimiter = ':')]
     pub system_lib_search_paths: Vec<PathBuf>,
+    /// Additional colon-separated library directories on the host.
+    #[arg(long, value_delimiter = ':')]
+    pub lib_search_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -76,4 +82,13 @@ pub struct PatchArgs {
     /// patchelf executable.
     #[arg(long, default_value = "patchelf")]
     pub patchelf: PathBuf,
+    /// Host library directories used to validate mapping targets.
+    #[arg(long, value_delimiter = ':')]
+    pub lib_search_paths: Vec<PathBuf>,
+    /// Target sysroot used to validate mapping targets. Defaults to / when validation is enabled.
+    #[arg(long)]
+    pub target_sysroot: Option<PathBuf>,
+    /// Colon-separated library directories interpreted inside the target sysroot.
+    #[arg(long, value_delimiter = ':')]
+    pub system_lib_search_paths: Vec<PathBuf>,
 }

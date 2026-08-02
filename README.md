@@ -126,14 +126,15 @@ Map syntax:
 
 ```text
 elfcmp map REFERENCE TARGET_SYSROOT MAPPING_TEMPLATE \
-  [--system-lib-search-paths PATHS]
+  [--system-lib-search-paths PATHS] [--lib-search-paths HOST_PATHS]
 ```
 
 Example:
 
 ```sh
 elfcmp map bundle/elfcmp-reference.yaml /target/sysroot mapping-template.yaml \
-  --system-lib-search-paths /lib64:/usr/lib64
+  --system-lib-search-paths /lib64:/usr/lib64 \
+  --lib-search-paths /opt/elfcmp/lib:/work/compat
 ```
 
 - `REFERENCE` is the YAML reference table produced by `elfcmp copy`.
@@ -150,6 +151,10 @@ elfcmp map bundle/elfcmp-reference.yaml /target/sysroot mapping-template.yaml \
   `/lib64:/usr/lib64` means `TARGET_SYSROOT/lib64` and
   `TARGET_SYSROOT/usr/lib64`. The built-in search directories described in the
   copy step are still searched.
+
+- `--lib-search-paths` supplies colon-separated directories on the host
+  filesystem. They are searched before the sysroot paths and are not
+  interpreted relative to `TARGET_SYSROOT`. Its default is empty.
 
 An unedited entry looks like:
 
@@ -173,14 +178,15 @@ Check syntax:
 
 ```text
 elfcmp check REFERENCE TARGET_SYSROOT MAPPING \
-  [--system-lib-search-paths PATHS]
+  [--system-lib-search-paths PATHS] [--lib-search-paths HOST_PATHS]
 ```
 
 Example:
 
 ```sh
 elfcmp check bundle/elfcmp-reference.yaml /target/sysroot mapping.yaml \
-  --system-lib-search-paths /lib64:/usr/lib64
+  --system-lib-search-paths /lib64:/usr/lib64 \
+  --lib-search-paths /opt/elfcmp/lib:/work/compat
 ```
 
 - `REFERENCE` and `TARGET_SYSROOT` have the same meanings as in `map`.
@@ -189,6 +195,9 @@ elfcmp check bundle/elfcmp-reference.yaml /target/sysroot mapping.yaml \
 
 - `--system-lib-search-paths` has the same meaning and empty default as in
   `map`.
+
+- `--lib-search-paths` has the same host-directory meaning, precedence, and
+  empty default as in `map`.
 
 `check` verifies that mapping sources occur in the reference table, every
 target-missing reference has a mapping, mappings do not duplicate a source, and
@@ -212,13 +221,17 @@ the providing library exposes the symbol with a version.
 Patch syntax:
 
 ```text
-elfcmp patch DIRECTORY [--mapping MAPPING] [--patchelf PATCHELF]
+elfcmp patch DIRECTORY [--mapping MAPPING] [--patchelf PATCHELF] \
+  [--target-sysroot TARGET_SYSROOT] [--system-lib-search-paths PATHS] \
+  [--lib-search-paths HOST_PATHS]
 ```
 
 Example with a mapping:
 
 ```sh
-elfcmp patch ./bundle --mapping ./mapping.yaml --patchelf /usr/bin/patchelf
+elfcmp patch ./bundle --mapping ./mapping.yaml --patchelf /usr/bin/patchelf \
+  --target-sysroot /target/sysroot --system-lib-search-paths /lib64:/usr/lib64 \
+  --lib-search-paths /opt/elfcmp/lib:/work/compat
 ```
 
 - `DIRECTORY` is the bundle directory produced by `copy`. It has no default.
@@ -230,6 +243,19 @@ elfcmp patch ./bundle --mapping ./mapping.yaml --patchelf /usr/bin/patchelf
 
 - `--patchelf` selects the `patchelf` executable. Its default is `patchelf`,
   resolved through `PATH`.
+
+- `--lib-search-paths` supplies colon-separated host directories used to
+  validate every mapped target library, symbol, version, and ELF architecture
+  before patching. Host directories are searched first. Its default is empty.
+
+- `--target-sysroot` selects the target root filesystem used for the same
+  pre-patch validation. `--system-lib-search-paths` supplies colon-separated
+  directories interpreted beneath that sysroot, followed by the built-in
+  system directories. If validation is enabled without `--target-sysroot`, its
+  default is `/`.
+
+Supplying any of these three search options enables target-export validation.
+They are used only for checking and never copy libraries into the bundle.
 
 For every run, including one without `--mapping`, the executable RPATH is set
 to `$ORIGIN/lib` and library RPATHs are set to `$ORIGIN`. Therefore this command

@@ -10,11 +10,14 @@ fn endpoint_exists(
     root: &std::path::Path,
     endpoint: &SymbolEndpoint,
     paths: &[std::path::PathBuf],
+    host_paths: &[std::path::PathBuf],
     architecture: Option<&crate::manifest::ElfArchitecture>,
     libraries: &mut BTreeMap<String, Option<elf::ElfInfo>>,
 ) -> bool {
     if !libraries.contains_key(&endpoint.library) {
-        let library = match elf::find_library(root, &endpoint.library, paths, architecture) {
+        let library = match elf::find_host_library(&endpoint.library, host_paths, architecture)
+            .or_else(|_| elf::find_library(root, &endpoint.library, paths, architecture))
+        {
             Ok(path) => {
                 eprintln!("[check] library {}: {}", endpoint.library, path.display());
                 elf::inspect(&path).ok()
@@ -58,6 +61,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
             &args.target_sysroot,
             &entry.to,
             &args.system_lib_search_paths,
+            &args.lib_search_paths,
             reference.architecture.as_ref(),
             &mut libraries,
         ) {
@@ -107,6 +111,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
             &args.target_sysroot,
             &original,
             &args.system_lib_search_paths,
+            &args.lib_search_paths,
             reference.architecture.as_ref(),
             &mut libraries,
         );
