@@ -25,6 +25,9 @@ assert_contains "$TEST_TMP/compat-symbols.txt" "elfcmp_explicit_bzero@@COMPAT_1.
 
 "$READELF" --dyn-syms --wide "$TEST_TMP/build/hello" >"$TEST_TMP/symbols_before.txt"
 assert_contains "$TEST_TMP/symbols_before.txt" "explicit_bzero@GLIBC_2.25"
+"$READELF" --version-info --wide "$TEST_TMP/build/hello" \
+    >"$TEST_TMP/versions_before.txt"
+assert_contains "$TEST_TMP/versions_before.txt" "GLIBC_2.25"
 
 "$ELFCMP" copy "$TEST_TMP/build/hello" "$TEST_TMP/bundle" \
     --sysroot "$UBUNTU_SYSROOT" \
@@ -45,9 +48,15 @@ cp "$TEST_TMP/host-lib/libcompat.so.1" "$TEST_TMP/bundle/lib/"
     --lib-search-paths "$TEST_TMP/host-lib"
 
 "$READELF" --dyn-syms --wide "$TEST_TMP/bundle/hello" >"$TEST_TMP/symbols_after.txt"
+"$READELF" --version-info --wide "$TEST_TMP/bundle/hello" \
+    >"$TEST_TMP/versions_after.txt"
 assert_contains "$TEST_TMP/symbols_after.txt" "UND elfcmp_explicit_bzero"
 if grep -F "explicit_bzero@GLIBC_2.25" "$TEST_TMP/symbols_after.txt" >/dev/null; then
     echo "old explicit_bzero version remains after patch" >&2
+    exit 1
+fi
+if grep -F "GLIBC_2.25" "$TEST_TMP/versions_after.txt" >/dev/null; then
+    echo "unused GLIBC_2.25 requirement remains after patch" >&2
     exit 1
 fi
 [[ $($PATCHELF --print-rpath "$TEST_TMP/bundle/hello") == '$ORIGIN/lib' ]]

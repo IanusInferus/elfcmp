@@ -274,6 +274,64 @@ rewrites the existing 16-bit
 `.gnu.version` index without resizing the ELF. Unversioned targets use the global
 version index. Adding brand-new `.gnu.version_r` records is not yet supported.
 
+After rewriting the symbol-version indices, `patch` also removes version
+requirements no longer referenced by any undefined dynamic symbol. It relinks
+the existing `Verneed`/`Vernaux` structures and updates their counts in place,
+without resizing `.gnu.version_r`. This prevents the dynamic loader from
+rejecting an object because of a stale requirement such as `GLIBC_2.27` after
+all imports using that version have been mapped.
+
+## Checking patched files with readelf
+
+Use the dynamic symbol table to inspect the imports that the runtime linker
+actually uses:
+
+```sh
+readelf --dyn-syms --wide bundle/program > symbols_after.txt
+grep -E 'old_symbol|replacement_symbol' symbols_after.txt
+```
+
+An undefined import is marked `UND`. A versioned import is displayed as
+`symbol@VERSION`; an unversioned replacement has no `@VERSION` suffix. For
+example, after mapping `memfd_create@GLIBC_2.27` to
+`memfd_create_compat`, the expected entry resembles:
+
+```text
+FUNC GLOBAL DEFAULT UND memfd_create_compat
+```
+
+Use `--dyn-syms` rather than `--symbols` or `-s` for this check. The regular
+symbol table may retain debugging or static symbols that are irrelevant to
+dynamic linking.
+
+Inspect `.gnu.version`, `.gnu.version_r`, and `.gnu.version_d` with:
+
+```sh
+readelf --version-info --wide bundle/program > versions_after.txt
+grep -C 2 GLIBC_2.27 versions_after.txt
+```
+
+If every import using `GLIBC_2.27` was mapped, the grep should produce no
+remaining requirement for that version. A version name may legitimately remain
+when another undefined dynamic symbol still uses it.
+
+Check added dependencies and the patched search path with:
+
+```sh
+readelf --dynamic --wide bundle/program |
+    grep -E '\(NEEDED\)|\(RPATH\)|\(RUNPATH\)'
+```
+
+An executable bundle normally reports `$ORIGIN/lib`; bundled shared objects and
+the dynamic loader normally report `$ORIGIN`. A compatibility library referenced
+by a mapping should appear as a `NEEDED` entry when it was not already present.
+
+The ELF interpreter can be checked separately:
+
+```sh
+readelf --program-headers --wide bundle/program | grep 'Requesting program interpreter'
+```
+
 ## Commands
 
 Run `elfcmp help` or `elfcmp <command> --help` for all options.
