@@ -73,10 +73,7 @@ pub fn run(args: PatchArgs) -> Result<()> {
 
     for object in &objects {
         let info = elf::inspect(object)?;
-        if object
-            .file_name()
-            .is_some_and(|name| elf::is_shared_library_filename(&name.to_string_lossy()))
-        {
+        if info.is_shared_object {
             eprintln!("[patch] library object: {}", object.display());
         }
         for needed in &info.needed {
@@ -123,10 +120,11 @@ pub fn run(args: PatchArgs) -> Result<()> {
                 }
             }
         }
-        let is_library = object
-            .file_name()
-            .is_some_and(|name| elf::is_shared_library_filename(&name.to_string_lossy()));
-        let rpath = if is_library { "$ORIGIN" } else { "$ORIGIN/lib" };
+        let rpath = if info.is_shared_object {
+            "$ORIGIN"
+        } else {
+            "$ORIGIN/lib"
+        };
         invoke(
             &args.patchelf,
             &[

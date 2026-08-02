@@ -40,7 +40,10 @@ test -f "$TEST_TMP/bundle/elfcmp-reference.yaml"
 "$READELF" --file-header "$TEST_TMP/bundle/$DEPENDENCY_NAME" \
     | grep -F "Machine:" | grep -F "Advanced Micro Devices X86-64"
 
+cp "$TEST_TMP/bundle/$DEPENDENCY_NAME" \
+    "$TEST_TMP/bundle/ld-linux-x86-64.so.2"
 "$ELFCMP" patch "$TEST_TMP/bundle" --patchelf "$PATCHELF"
 [[ $($PATCHELF --print-rpath "$TEST_TMP/bundle/$LIBRARY_NAME") == '$ORIGIN' ]]
+[[ $($PATCHELF --print-rpath "$TEST_TMP/bundle/ld-linux-x86-64.so.2") == '$ORIGIN' ]]
 
 echo "PASS: shared-library bundle keeps its files at the bundle root"

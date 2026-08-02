@@ -10,6 +10,7 @@ use std::{
 #[derive(Debug)]
 pub struct ElfInfo {
     pub architecture: ElfArchitecture,
+    pub is_shared_object: bool,
     pub needed: Vec<String>,
     pub imported: BTreeSet<(String, Option<String>)>,
     pub exported: BTreeSet<(String, Option<String>)>,
@@ -61,6 +62,8 @@ pub fn inspect(path: &Path) -> Result<ElfInfo> {
             bits: if elf.is_64 { 64 } else { 32 },
             endianness: if elf.little_endian { "little" } else { "big" }.to_owned(),
         },
+        is_shared_object: elf.header.e_type == goblin::elf::header::ET_DYN
+            && elf.interpreter.is_none(),
         needed: elf.libraries.iter().map(|s| (*s).to_owned()).collect(),
         imported,
         exported,
@@ -345,6 +348,7 @@ mod tests {
                 bits: 64,
                 endianness: "little".into(),
             },
+            is_shared_object: true,
             needed: Vec::new(),
             imported: BTreeSet::new(),
             exported,
@@ -367,6 +371,7 @@ mod tests {
                 bits: 64,
                 endianness: "little".into(),
             },
+            is_shared_object: false,
             needed: Vec::new(),
             imported: BTreeSet::new(),
             exported: BTreeSet::new(),
