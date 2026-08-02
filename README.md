@@ -114,8 +114,8 @@ records imported symbols supplied by skipped system libraries.
 
 - `--system-lib-basenames` identifies system libraries that are referenced but
   not copied. Its default is
-  `libc,libdl,libm,libpthread,librt,libselinux`. Supplying the option replaces
-  that complete list; it does not add to the defaults. Matching removes only
+  `libc,libdl,libm,libpthread,librt,libselinux,ld-linux-x86-64`. Supplying the
+  option replaces that complete list; it does not add to the defaults. Matching removes only
   the final `.so` and its numeric version suffix: `liba.b.c.so.1.2.3` has
   basename `liba.b.c`. Dots within the library name remain significant. Thus
   `libc` matches `libc.so.6`, but not `libc++.so.1` or `libcrypt.so.1`.

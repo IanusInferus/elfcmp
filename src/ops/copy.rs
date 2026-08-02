@@ -13,8 +13,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const SYSTEM_LIB_BASENAMES: &[&str] =
-    &["libc", "libdl", "libm", "libpthread", "librt", "libselinux"];
+const SYSTEM_LIB_BASENAMES: &[&str] = &[
+    "libc",
+    "libdl",
+    "libm",
+    "libpthread",
+    "librt",
+    "libselinux",
+    "ld-linux-x86-64",
+];
 
 pub fn run(args: CopyArgs) -> Result<()> {
     if !args.input.is_file() {
@@ -252,7 +259,15 @@ mod tests {
     fn omitted_basenames_use_defaults() {
         assert_eq!(
             system_lib_basenames(Vec::new()),
-            ["libc", "libdl", "libm", "libpthread", "librt", "libselinux"]
+            [
+                "libc",
+                "libdl",
+                "libm",
+                "libpthread",
+                "librt",
+                "libselinux",
+                "ld-linux-x86-64"
+            ]
         );
     }
 
@@ -279,6 +294,7 @@ mod tests {
         assert!(!is_system_library("libcrypt.so.1", &base_names));
         assert!(is_system_library("libm.so.6", &base_names));
         assert!(!is_system_library("libmount.so.1", &base_names));
+        assert!(is_system_library("ld-linux-x86-64.so.2", &base_names));
     }
 
     #[test]
